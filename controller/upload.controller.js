@@ -2,43 +2,65 @@ const { google } = require("googleapis");
 const path = require("path");
 const fs = require("fs");
 
-
 const KEY_FILE_PATH = path.join("some-service-account.json");
 
 const SCOPES = ["https://www.googleapis.com/auth/drive"];
 
 const auth = new google.auth.GoogleAuth({
-    keyFile: KEY_FILE_PATH,
-    scopes: SCOPES,
-})
+  keyFile: KEY_FILE_PATH,
+  scopes: SCOPES,
+});
 
-exports.getFileDetails = async (req, res) => {
+exports.uploadFile = async (req, res) => {
+  try {
+    const { file } = req;
 
-    try {
+    const { data } = await google
+      .drive({ version: "v3", auth: auth })
+      .files.create({
+        media: {
+          mimeType: file.mimeType,
+          body: fs.createReadStream(file.path),
+        },
+        requestBody: {
+          name: file.originalname,
+          parents: ["1x7Gn5kFagQZDryQ8THmoJRxaH_9xAwI_"], //folder id in which file should be uploaded
+        },
+        fields: "id,name",
+      });
 
-        const { file } = req;
+    console.log(`File uploaded successfully -> ${JSON.stringify(data)}`);
 
-        const { data } = await google.drive({ version: "v3", auth: auth }).files
-            .create({
-                media: {
-                    mimeType: file.mimeType,
-                    body: fs.createReadStream(file.path)
-                },
-                requestBody: {
-                    name: file.originalname,
-                    parents: ["1x7Gn5kFagQZDryQ8THmoJRxaH_9xAwI_"]   //folder id in which file should be uploaded
-                },
-                fields: "id,name"
-            })
+    res.json({
+      status: 1,
+      message: "success",
+      file_id: data.id,
+      file_name: data.name,
+    });
+  } catch (error) {
+    console.log(error);
+    res.json({ status: -1, message: "failure", err: error.message });
+  }
+};
 
-        console.log(`File uploaded successfully -> ${JSON.stringify(data)}`);
+exports.getFiles = async (req, res) => {
+  const folderId = "1x7Gn5kFagQZDryQ8THmoJRxaH_9xAwI_"; // Replace with your folder ID
 
-        res.json({ status: 1, message: "success", file_id: data.id, file_name: data.name });
-
-    } catch (error) {
-
-        console.log(error);
-        res.json({ status: -1, message: "failure", err: error.message });
-
-    }
-}
+  try {
+    const response = await google
+      .drive({ version: "v3", auth: auth })
+      .files.list({
+        q: `'${folderId}' in parents and mimeType='application/pdf'`,
+        fields: "files(id, name, webContentLink)",
+      });
+    // const files = response.data.files;
+    const files = response.data.files.map(file => ({
+        id: file.id,
+        name: file.name,
+        downloadLink: file.webContentLink,
+    }));
+    res.status(200).json(files);
+  } catch (error) {
+    res.status(500).send(error.toString());
+  }
+};

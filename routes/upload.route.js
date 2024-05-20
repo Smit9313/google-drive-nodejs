@@ -6,7 +6,7 @@ const os = require("os");
 
 const router = express.Router();
 
-const { getFileDetails } = require("../controller/upload.controller.js");
+const { uploadFile, getFiles } = require("../controller/upload.controller.js");
 
 const storage = multer.diskStorage({
   destination: os.tmpdir(),
@@ -15,6 +15,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-router.post("/uploadToDrive", upload.single("drive_file"), getFileDetails);
+router.get("/getFromDrive", getFiles);
+router.post("/uploadToDrive", upload.single("drive_file"), uploadFile);
 
 module.exports = router;
